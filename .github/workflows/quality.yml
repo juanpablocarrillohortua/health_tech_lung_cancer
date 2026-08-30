@@ -1,0 +1,38 @@
+# PEP 8 gate. Runs the same `make quality` target you run locally, so CI and
+# your machine give the same verdict: ruff check + ruff format --check over
+# scraper/, src/, utils/ and the notebooks.
+name: quality
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# A newer commit on the same ref supersedes the run in flight. Push and pull
+# request runs sit in different groups (refs/heads/... vs refs/pull/.../merge),
+# so they never cancel each other -- they test different commits.
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 3.13 matches target-version = "py313" in ruff.toml.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      # The gate is static analysis: it needs ruff and nothing else. The full
+      # requirements.txt would pull in pandas and matplotlib for no benefit.
+      - name: Install lint tooling
+        run: make install-dev
+
+      - name: Run the quality gate
+        run: make quality
