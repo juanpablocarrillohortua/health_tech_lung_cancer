@@ -19,6 +19,7 @@ PALETTE = [
 YLAB = {False: "Conteo", True: "Porcentaje"}
 
 Labels = Literal["none", "count", "pct", "both"]
+Orient = Literal["v", "h"]
 
 
 def _pretty(s: str) -> str:
@@ -56,29 +57,42 @@ def _bar_labels(ax, container, counts, pcts, labels: Labels, fontsize=11):
     )
 
 
-def _style(ax, title, xlabel, ylabel, pct, rot, headroom):
-    """Aplica el estilo visual compartido por todos los gráficos."""
+def _style(
+    ax, title, xlabel, ylabel, pct, rot, headroom, orient: Orient = "v"
+):
+    """Aplica el estilo visual compartido por todos los gráficos.
+
+    orient : "v" -> barras verticales | "h" -> barras horizontales. El eje
+             de valores (formato, rejilla y headroom) sigue la orientación.
+    """
+    horiz = orient == "h"
+    val_ax, cat_ax = (ax.xaxis, ax.yaxis) if horiz else (ax.yaxis, ax.xaxis)
+    if horiz:
+        xlabel, ylabel = ylabel, xlabel
     ax.set_facecolor("white")
     ax.set_title(
         title, loc="left", pad=20, fontsize=18, fontweight="bold", color=INK
     )
     ax.set_xlabel(xlabel, fontsize=12, color=TXT, labelpad=12)
     ax.set_ylabel(ylabel, fontsize=12, color=TXT, labelpad=12)
-    ax.yaxis.set_major_formatter(
+    val_ax.set_major_formatter(
         mtick.PercentFormatter(decimals=0)
         if pct
         else mtick.FuncFormatter(
             lambda v, _: f"{v / 1000:.1f}k" if v >= 1000 else f"{v:.0f}"
         )
     )
-    ax.tick_params(axis="x", rotation=rot, labelsize=10, colors=TXT, length=0)
+    ax.tick_params(axis="x", labelsize=10, colors=TXT, length=0)
     ax.tick_params(axis="y", labelsize=10, colors=TXT, length=0)
+    # La rotación es para nombres de categoría largos: sigue al eje
+    # categórico, que cambia de lado con la orientación.
+    ax.tick_params(axis=cat_ax.axis_name, rotation=rot)
     if rot:
-        plt.setp(ax.get_xticklabels(), ha="right", rotation_mode="anchor")
+        plt.setp(cat_ax.get_ticklabels(), ha="right", rotation_mode="anchor")
     ax.set_axisbelow(True)
-    ax.yaxis.grid(True, linestyle="--", color=GRID, linewidth=1.0)
-    ax.xaxis.grid(False)
-    ax.margins(y=headroom)
+    val_ax.grid(True, linestyle="--", color=GRID, linewidth=1.0)
+    cat_ax.grid(False)
+    ax.margins(**{val_ax.axis_name: headroom})
     sns.despine(ax=ax, left=True, bottom=True)
     plt.tight_layout()
 
@@ -95,6 +109,7 @@ def fancy_bars(
     figsize: tuple[float, float] = (9, 7),
     rot: float = 0,
     top: int | None = None,
+    orient: Orient = "v",
 ) -> plt.Axes:
     """Distribución de una variable categórica.
 
@@ -103,9 +118,13 @@ def fancy_bars(
     order   : orden de las categorías (default: de mayor a menor)
     palette : nombre de paleta seaborn o lista de colores
     top     : mostrar solo las N categorías más frecuentes
+    orient  : "v" -> barras verticales | "h" -> barras horizontales
+              (categorías a la izquierda, útil con nombres largos)
     """
     if labels not in {"none", "count", "pct", "both"}:
         raise ValueError("labels debe ser: 'none', 'count', 'pct' o 'both'")
+    if orient not in {"v", "h"}:
+        raise ValueError("orient debe ser: 'v' o 'h'")
 
     vc = df[x].value_counts(dropna=False)
     if order is not None:
@@ -119,13 +138,9 @@ def fancy_bars(
     if ax is None:
         _, ax = plt.subplots(figsize=figsize)
     colors = _colors(len(vc), palette)
-    sns.barplot(
-        x=cats,
-        y=(pcts if pct else vc).values,
-        color=colors[0],
-        width=0.62,
-        ax=ax,
-    )
+    vals = (pcts if pct else vc).values
+    xy = {"y": cats, "x": vals} if orient == "h" else {"x": cats, "y": vals}
+    sns.barplot(**xy, color=colors[0], width=0.62, orient=orient, ax=ax)
     for patch, color in zip(ax.containers[0], colors):
         patch.set_facecolor(color)
     _bar_labels(ax, ax.containers[0], vc.values, pcts.values, labels)
@@ -137,6 +152,7 @@ def fancy_bars(
         pct,
         rot,
         0.14 if labels != "none" else 0.05,
+        orient,
     )
     return ax
 
@@ -156,6 +172,7 @@ def plot_cat_relation(
     figsize: tuple[float, float] = (10, 6),
     rot: float = 0,
     top: int | None = None,
+    orient: Orient = "v",
 ) -> plt.Axes:
     """Relación entre dos variables categóricas (barras agrupadas).
 
@@ -166,6 +183,8 @@ def plot_cat_relation(
     """
     if labels not in {"none", "count", "pct", "both"}:
         raise ValueError("labels debe ser: 'none', 'count', 'pct' o 'both'")
+    if orient not in {"v", "h"}:
+        raise ValueError("orient debe ser: 'v' o 'h'")
 
     ct = pd.crosstab(df[x], df[hue])
     order = (
@@ -196,15 +215,18 @@ def plot_cat_relation(
     )
     if ax is None:
         _, ax = plt.subplots(figsize=figsize)
+    # orient explícito: con categorías numéricas seaborn no puede deducir
+    # cuál eje es el categórico y cae a vertical dibujando barras vacías.
+    xy = {"y": x, "x": "_v"} if orient == "h" else {"x": x, "y": "_v"}
     sns.barplot(
         data=long,
-        x=x,
-        y="_v",
+        **xy,
         hue=hue,
         order=list(ct.index),
         hue_order=hue_order,
         palette=_colors(len(hue_order), palette),
         width=0.7,
+        orient=orient,
         ax=ax,
     )
 
@@ -221,6 +243,7 @@ def plot_cat_relation(
         pct,
         rot,
         0.14 if labels != "none" else 0.05,
+        orient,
     )
 
     legend = ax.legend(
