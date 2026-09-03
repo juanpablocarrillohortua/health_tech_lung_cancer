@@ -6,16 +6,18 @@ https://github.com/DIAGNijmegen/luna25-baseline-public/blob/main/dataloader.py
 PLACEHOLDER, IT SHOULD BE IMPROVED IN ORDER TO USE GPU AND BE MORE READABLE
 """
 
-
 from pathlib import Path
+
 import numpy as np
+import numpy.linalg as npl
+import pandas as pd
+import scipy.ndimage as ndi
 import torch
 import torch.utils.data as data
 from torch.utils.data import DataLoader
-import numpy.linalg as npl
-import scipy.ndimage as ndi
+
 from config import config
-import pandas as pd
+
 
 def _calculateAllPermutations(itemList):
     if len(itemList) == 1:
@@ -147,7 +149,9 @@ def volumeTransform(
         # No output dimensions are specified
         # Therefore we calculate the region that will span the whole image
         # considering the transform matrix and voxel spacing.
-        image_axes = [[0 - o, x - 1 - o] for o, x in zip(voxelCenter, image.shape)]
+        image_axes = [
+            [0 - o, x - 1 - o] for o, x in zip(voxelCenter, image.shape)
+        ]
         image_corners = _calculateAllPermutations(image_axes)
 
         transformed_image_corners = map(
@@ -170,8 +174,9 @@ def volumeTransform(
 
     # Calculate the backwards matrix which will be used for the slice extraction
     backwards_matrix = npl.inv(forward_matrix)
-    target_image_offset = voxelCenter - backwards_matrix.dot((output_shape - 1) / 2.0)
-
+    target_image_offset = voxelCenter - backwards_matrix.dot(
+        (output_shape - 1) / 2.0
+    )
 
     return ndi.affine_transform(
         image,
@@ -190,27 +195,33 @@ def clip_and_scale(npzarray, maxHU=400.0, minHU=-1000.0):
 
 
 def rotateMatrixX(cosAngle, sinAngle):
-    return np.asarray([[1, 0, 0], [0, cosAngle, -sinAngle], [0, sinAngle, cosAngle]])
+    return np.asarray(
+        [[1, 0, 0], [0, cosAngle, -sinAngle], [0, sinAngle, cosAngle]]
+    )
 
 
 def rotateMatrixY(cosAngle, sinAngle):
-    return np.asarray([[cosAngle, 0, sinAngle], [0, 1, 0], [-sinAngle, 0, cosAngle]])
+    return np.asarray(
+        [[cosAngle, 0, sinAngle], [0, 1, 0], [-sinAngle, 0, cosAngle]]
+    )
 
 
 def rotateMatrixZ(cosAngle, sinAngle):
-    return np.asarray([[cosAngle, -sinAngle, 0], [sinAngle, cosAngle, 0], [0, 0, 1]])
+    return np.asarray(
+        [[cosAngle, -sinAngle, 0], [sinAngle, cosAngle, 0], [0, 0, 1]]
+    )
 
 
 class CTCaseDataset(data.Dataset):
     """LUNA25 baseline dataset
-            Args:
-            data_dir (str): path to the nodule_blocks data directory
-            dataset (pd.DataFrame): dataframe with the dataset information
-            translations (bool): whether to apply random translations
-            rotations (tuple): tuple with the rotation ranges
-            size_px (int): size of the patch in pixels
-            size_mm (int): size of the patch in mm
-            mode (str): 2D or 3D
+    Args:
+    data_dir (str): path to the nodule_blocks data directory
+    dataset (pd.DataFrame): dataframe with the dataset information
+    translations (bool): whether to apply random translations
+    rotations (tuple): tuple with the rotation ranges
+    size_px (int): size of the patch in pixels
+    size_mm (int): size of the patch in mm
+    mode (str): 2D or 3D
 
     """
 
@@ -233,7 +244,6 @@ class CTCaseDataset(data.Dataset):
         self.size_px = size_px
         self.size_mm = size_mm
         self.mode = mode
-
 
     def __getitem__(self, idx):  # caseid, z, y, x, label, radius
 
@@ -258,7 +268,6 @@ class CTCaseDataset(data.Dataset):
         if self.translations == True:
             radius = 2.5
             translations = radius if radius > 0 else None
-
 
         if self.mode == "2D":
             output_shape = (1, self.size_px, self.size_px)
@@ -308,7 +317,6 @@ class CTCaseDataset(data.Dataset):
         return fmt_str
 
 
-
 def sample_random_coordinate_on_sphere(radius):
     # Generate three random numbers x,y,z using Gaussian distribution
     random_nums = np.random.normal(size=(3,))
@@ -319,6 +327,7 @@ def sample_random_coordinate_on_sphere(radius):
 
     # Normalise numbers and multiply number by radius of sphere
     return random_nums / np.sqrt(np.sum(random_nums * random_nums)) * radius
+
 
 def extract_patch(
     CTData,
@@ -340,9 +349,15 @@ def extract_patch(
         (zmin, zmax), (ymin, ymax), (xmin, xmax) = rotations
 
         # add random rotation
-        angleX = np.multiply(np.pi / 180.0, np.random.randint(xmin, xmax, 1))[0]
-        angleY = np.multiply(np.pi / 180.0, np.random.randint(ymin, ymax, 1))[0]
-        angleZ = np.multiply(np.pi / 180.0, np.random.randint(zmin, zmax, 1))[0]
+        angleX = np.multiply(np.pi / 180.0, np.random.randint(xmin, xmax, 1))[
+            0
+        ]
+        angleY = np.multiply(np.pi / 180.0, np.random.randint(ymin, ymax, 1))[
+            0
+        ]
+        angleZ = np.multiply(np.pi / 180.0, np.random.randint(zmin, zmax, 1))[
+            0
+        ]
 
         transformMatrixAug = np.eye(3)
         transformMatrixAug = np.dot(
@@ -381,7 +396,9 @@ def extract_patch(
     else:
         # image coord sampling
         overrideCoord = coord * srcVoxelSpacing
-    overrideMatrix = (invSrcMatrix.dot(thisTransformMatrix.T) * srcVoxelSpacing).T
+    overrideMatrix = (
+        invSrcMatrix.dot(thisTransformMatrix.T) * srcVoxelSpacing
+    ).T
 
     patch = volumeTransform(
         CTData,
@@ -402,6 +419,7 @@ def extract_patch(
         patch = np.expand_dims(patch, axis=0)
 
     return patch
+
 
 def get_data_loader(
     data_dir,
@@ -442,11 +460,13 @@ def get_data_loader(
 
     return data_loader
 
+
 def test():
     # Test the dataloader
-    import pandas as pd
-    from config import config
     import matplotlib.pyplot as plt
+    import pandas as pd
+
+    from config import config
 
     dataset = pd.read_csv(config.CSV_DIR_VALID)
 
@@ -464,6 +484,7 @@ def test():
 
     for i, data in enumerate(train_loader):
         print(i, data["image"].shape, data["label"].shape)
+
 
 if __name__ == "__main__":
     test()

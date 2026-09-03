@@ -1,9 +1,23 @@
-# PEP 8 configuration for scraper/, src/, utils/ and notebooks/.
+# PEP 8 configuration for utils/, data_loader/ and notebooks/.
 # Driven by the Makefile: `make lint`, `make format`, `make quality`.
 
 line-length = 79            # PEP 8 hard limit; raise to 88/100 if too noisy
 target-version = "py313"
 extend-include = ["*.ipynb"]  # lint notebooks cell by cell
+
+# Excluido a propósito: data_loader/dataloader.py viene casi literal del
+# baseline de LUNA25 (DIAGNijmegen/luna25-baseline-public) y su propio
+# docstring lo marca PLACEHOLDER. Sus hallazgos son estilo de upstream
+# --la mayoría nombres camelCase (N802/N803/N806)-- y arreglarlos haría
+# ilegible cualquier diff contra el original. Se revisará cuando el
+# módulo se reescriba, no antes. data_loader/unzip_data.py sí se revisa.
+extend-exclude = ["data_loader/dataloader.py"]
+
+# Sin esto la exclusión solo aplica cuando ruff descubre el archivo
+# recorriendo un directorio, que es lo que hace el Makefile. Una ruta de
+# archivo explícita --la que manda la extensión del editor-- se saltaría
+# la exclusión y el archivo seguiría marcado.
+force-exclude = true
 
 [lint]
 select = [
