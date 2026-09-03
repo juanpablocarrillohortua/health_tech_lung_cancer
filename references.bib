@@ -1,0 +1,294 @@
+% References for health_tech_lung_cancer
+% Human-readable version (APA 7): see the "References" section of README.md
+% Encoding: UTF-8
+
+% ---------------------------------------------------------------------------
+% Replicated study
+% ---------------------------------------------------------------------------
+
+@article{venkadesh2021deep,
+  author  = {Venkadesh, Kiran V. and Setio, Arnaud A. A. and
+             Schreuder, Anton and Scholten, Ernst T. and Chung, Kaman and
+             Winkler Wille, Mathilde M. and van Ginneken, Bram and
+             Prokop, Mathias and Jacobs, Colin},
+  title   = {Deep Learning for Malignancy Risk Estimation of Pulmonary
+             Nodules Detected at Low-Dose Screening {CT}},
+  journal = {Radiology},
+  volume  = {300},
+  number  = {2},
+  pages   = {438--447},
+  year    = {2021},
+  doi     = {10.1148/radiol.2021204433},
+  url     = {https://pubs.rsna.org/doi/10.1148/radiol.2021204433}
+}
+
+% ---------------------------------------------------------------------------
+% Data sources
+% ---------------------------------------------------------------------------
+
+@dataset{peeters2025luna25imaging,
+  author    = {Peeters, Dr{\'e} and Obreja, Bogdan and Antonissen, Noa and
+               Jacobs, Colin},
+  title     = {The {LUNA25} Challenge: Public Training and Development set
+               --- Imaging Data},
+  version   = {1.0.0},
+  year      = {2025},
+  month     = {2},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.14223624},
+  url       = {https://zenodo.org/records/14223624},
+  note      = {Licensed CC-BY-4.0}
+}
+
+@dataset{peeters2025luna25annotations,
+  author    = {Peeters, Dr{\'e} and Obreja, Bogdan and Antonissen, Noa and
+               Jacobs, Colin},
+  title     = {The {LUNA25} Challenge: Public Training and Development set
+               --- Annotation Data},
+  version   = {1.0.0},
+  year      = {2025},
+  month     = {1},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.14673658},
+  url       = {https://zenodo.org/records/14673658},
+  note      = {Licensed CC-BY-NC-4.0}
+}
+
+@dataset{nlst2013data,
+  author    = {{National Lung Screening Trial Research Team}},
+  title     = {Data from the National Lung Screening Trial ({NLST})},
+  year      = {2013},
+  publisher = {The Cancer Imaging Archive},
+  doi       = {10.7937/TCIA.HMQ8-J677},
+  url       = {https://www.cancerimagingarchive.net/collection/nlst/},
+  note      = {Data citation required by the collection}
+}
+
+@article{aberle2011reduced,
+  author  = {Aberle, Denise R. and Adams, Amanda M. and Berg, Christine D. and
+             Black, William C. and Clapp, Jonathan D. and
+             Fagerstrom, Richard M. and Gareen, Ilana F. and
+             Gatsonis, Constantine and Marcus, Pamela M. and
+             Sicks, JoRean D.},
+  title   = {Reduced Lung-Cancer Mortality with Low-Dose Computed
+             Tomographic Screening},
+  journal = {New England Journal of Medicine},
+  volume  = {365},
+  number  = {5},
+  pages   = {395--409},
+  year    = {2011},
+  doi     = {10.1056/nejmoa1102873}
+}
+
+% ---------------------------------------------------------------------------
+% Tools and implementations
+% ---------------------------------------------------------------------------
+
+@misc{luna25challenge,
+  author       = {{Diagnostic Image Analysis Group, Radboud University
+                  Medical Center}},
+  title        = {{LUNA25}: Lung Nodule Analysis 2025 Challenge},
+  year         = {2025},
+  howpublished = {\url{https://luna25.grand-challenge.org/}},
+  url          = {https://luna25.grand-challenge.org/},
+  urldate      = {2026-09-02}
+}
+
+@software{diagnijmegen2025baseline,
+  author       = {{Diagnostic Image Analysis Group, Radboud University
+                  Medical Center}},
+  title        = {{LUNA25} Baseline (public)},
+  year         = {2025},
+  publisher    = {GitHub},
+  url          = {https://github.com/DIAGNijmegen/luna25-baseline-public},
+  urldate      = {2026-09-02}
+}
+
+@misc{jacobs2021algorithm,
+  author       = {Jacobs, Colin and Venkadesh, Kiran V. and
+                  van Ginneken, Bram},
+  title        = {Pulmonary Nodule Malignancy Prediction},
+  year         = {2021},
+  howpublished = {Grand Challenge algorithm},
+  url          = {https://grand-challenge.org/algorithms/pulmonary-nodule-malignancy-prediction/},
+  urldate      = {2026-09-02}
+}
+
+@software{hasson2017i3dpytorch,
+  author    = {Hasson, Yana},
+  title     = {kinetics\_i3d\_pytorch: Inflated 3D {ConvNet} models and
+               weights transferred from {TensorFlow} to {PyTorch}},
+  year      = {2017},
+  publisher = {GitHub},
+  url       = {https://github.com/hassony2/kinetics_i3d_pytorch},
+  urldate   = {2026-09-02},
+  note      = {MIT licence; source of the pretrained I3D weights referenced
+               by config.MODEL\_RGB\_I3D}
+}
+
+@inproceedings{carreira2017quo,
+  author    = {Carreira, Jo{\~a}o and Zisserman, Andrew},
+  title     = {Quo Vadis, Action Recognition? {A} New Model and the
+               Kinetics Dataset},
+  booktitle = {Proceedings of the IEEE Conference on Computer Vision and
+               Pattern Recognition (CVPR)},
+  pages     = {6299--6308},
+  year      = {2017},
+  doi       = {10.1109/CVPR.2017.502},
+  url       = {https://arxiv.org/abs/1705.07750}
+}
+
+% ---------------------------------------------------------------------------
+% Software libraries
+% ---------------------------------------------------------------------------
+
+@article{harris2020array,
+  author  = {Harris, Charles R. and Millman, K. Jarrod and
+             van der Walt, St{\'e}fan J. and Gommers, Ralf and
+             Virtanen, Pauli and Cournapeau, David and Wieser, Eric and
+             Taylor, Julian and Berg, Sebastian and Smith, Nathaniel J. and
+             Kern, Robert and Picus, Matti and Hoyer, Stephan and
+             van Kerkwijk, Marten H. and Brett, Matthew and
+             Haldane, Allan and del R{\'i}o, Jaime Fern{\'a}ndez and
+             Wiebe, Mark and Peterson, Pearu and
+             G{\'e}rard-Marchant, Pierre and Sheppard, Kevin and
+             Reddy, Tyler and Weckesser, Warren and Abbasi, Hameer and
+             Gohlke, Christoph and Oliphant, Travis E.},
+  title   = {Array Programming with {NumPy}},
+  journal = {Nature},
+  volume  = {585},
+  number  = {7825},
+  pages   = {357--362},
+  year    = {2020},
+  doi     = {10.1038/s41586-020-2649-2},
+  note    = {Version 2.5.2}
+}
+
+@inproceedings{mckinney2010data,
+  author    = {McKinney, Wes},
+  title     = {Data Structures for Statistical Computing in {Python}},
+  booktitle = {Proceedings of the 9th Python in Science Conference},
+  pages     = {56--61},
+  year      = {2010},
+  doi       = {10.25080/Majora-92bf1922-00a},
+  note      = {pandas, version 3.0.5}
+}
+
+@article{virtanen2020scipy,
+  author  = {Virtanen, Pauli and Gommers, Ralf and Oliphant, Travis E. and
+             Haberland, Matt and Reddy, Tyler and Cournapeau, David and
+             Burovski, Evgeni and Peterson, Pearu and Weckesser, Warren and
+             Bright, Jonathan and van der Walt, St{\'e}fan J. and
+             Brett, Matthew and Wilson, Joshua and Millman, K. Jarrod and
+             Mayorov, Nikolay and Nelson, Andrew R. J. and Jones, Eric and
+             Kern, Robert and Larson, Eric and Carey, C J and
+             Polat, {\.I}lhan and Feng, Yu and Moore, Eric W. and
+             VanderPlas, Jake and Laxalde, Denis and Perktold, Josef and
+             Cimrman, Robert and Henriksen, Ian and Quintero, E. A. and
+             Harris, Charles R. and Archibald, Anne M. and
+             Ribeiro, Ant{\^o}nio H. and Pedregosa, Fabian and
+             van Mulbregt, Paul},
+  title   = {{SciPy} 1.0: Fundamental Algorithms for Scientific Computing
+             in {Python}},
+  journal = {Nature Methods},
+  volume  = {17},
+  number  = {3},
+  pages   = {261--272},
+  year    = {2020},
+  doi     = {10.1038/s41592-019-0686-2},
+  note    = {Version 1.18.1}
+}
+
+@article{hunter2007matplotlib,
+  author  = {Hunter, John D.},
+  title   = {Matplotlib: A 2{D} Graphics Environment},
+  journal = {Computing in Science \& Engineering},
+  volume  = {9},
+  number  = {3},
+  pages   = {90--95},
+  year    = {2007},
+  doi     = {10.1109/MCSE.2007.55},
+  note    = {Version 3.11.1}
+}
+
+@article{waskom2021seaborn,
+  author  = {Waskom, Michael L.},
+  title   = {seaborn: Statistical Data Visualization},
+  journal = {Journal of Open Source Software},
+  volume  = {6},
+  number  = {60},
+  pages   = {3021},
+  year    = {2021},
+  doi     = {10.21105/joss.03021},
+  note    = {Version 0.13.2}
+}
+
+@inproceedings{seabold2010statsmodels,
+  author    = {Seabold, Skipper and Perktold, Josef},
+  title     = {statsmodels: Econometric and Statistical Modeling with
+               {Python}},
+  booktitle = {Proceedings of the 9th Python in Science Conference},
+  pages     = {92--96},
+  year      = {2010},
+  doi       = {10.25080/Majora-92bf1922-011},
+  note      = {Version 0.15.0}
+}
+
+@inproceedings{paszke2019pytorch,
+  author    = {Paszke, Adam and Gross, Sam and Massa, Francisco and
+               Lerer, Adam and Bradbury, James and Chanan, Gregory and
+               Killeen, Trevor and Lin, Zeming and Gimelshein, Natalia and
+               Antiga, Luca and Desmaison, Alban and K{\"o}pf, Andreas and
+               Yang, Edward and DeVito, Zachary and Raison, Martin and
+               Tejani, Alykhan and Chilamkurthy, Sasank and
+               Steiner, Benoit and Fang, Lu and Bai, Junjie and
+               Chintala, Soumith},
+  title     = {{PyTorch}: An Imperative Style, High-Performance Deep
+               Learning Library},
+  booktitle = {Advances in Neural Information Processing Systems 32},
+  pages     = {8024--8035},
+  year      = {2019},
+  url       = {https://papers.nips.cc/paper/9015-pytorch-an-imperative-style-high-performance-deep-learning-library},
+  note      = {Version 2.13.0}
+}
+
+@article{perez2007ipython,
+  author  = {P{\'e}rez, Fernando and Granger, Brian E.},
+  title   = {{IPython}: A System for Interactive Scientific Computing},
+  journal = {Computing in Science \& Engineering},
+  volume  = {9},
+  number  = {3},
+  pages   = {21--29},
+  year    = {2007},
+  doi     = {10.1109/MCSE.2007.53},
+  note    = {Version 9.17.0}
+}
+
+@inproceedings{kluyver2016jupyter,
+  author    = {Kluyver, Thomas and Ragan-Kelley, Benjamin and
+               P{\'e}rez, Fernando and Granger, Brian and
+               Bussonnier, Matthias and Frederic, Jonathan and
+               Kelley, Kyle and Hamrick, Jessica and Grout, Jason and
+               Corlay, Sylvain and Ivanov, Paul and Avila, Dami{\'a}n and
+               Abdalla, Safia and Willing, Carol},
+  title     = {Jupyter Notebooks --- a Publishing Format for Reproducible
+               Computational Workflows},
+  booktitle = {Positioning and Power in Academic Publishing: Players,
+               Agents and Agendas},
+  pages     = {87--90},
+  year      = {2016},
+  publisher = {IOS Press},
+  doi       = {10.3233/978-1-61499-649-1-87},
+  note      = {ipykernel 7.3.0}
+}
+
+@software{astral2025ruff,
+  author    = {{Astral Software Inc.}},
+  title     = {Ruff: An Extremely Fast {Python} Linter and Code Formatter},
+  version   = {0.16.5},
+  year      = {2025},
+  publisher = {GitHub},
+  url       = {https://github.com/astral-sh/ruff},
+  urldate   = {2026-09-02}
+}
+
