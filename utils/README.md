@@ -12,7 +12,8 @@ From a notebook, the `sys.path` hop is what makes `utils` resolve at all:
 ```python
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path.cwd().parent))   # notebooks/ -> repo root
+
+sys.path.insert(0, str(Path.cwd().parent))  # notebooks/ -> repo root
 
 from utils.fancy_barplot import fancy_bars
 from utils.target_against_features import test_features_against_target
