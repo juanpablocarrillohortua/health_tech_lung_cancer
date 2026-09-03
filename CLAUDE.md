@@ -20,7 +20,7 @@ Everything routes through `make`. It resolves `PYTHON` to `.venv/Scripts/python.
 | `make quality` | `clean` + `lint` + `format-check` — the CI gate |
 | `make clean` | drop `__pycache__`, `.ipynb_checkpoints`, tool caches |
 
-Lint scope is `PY_DIRS := utils data_loader` and `NB_DIRS := notebooks`. **`config.py` and `tools/` are not linted** — don't reformat them to satisfy a gate that never runs on them.
+Lint scope is `PY_DIRS := utils data_loader` and `NB_DIRS := notebooks`. **`config.py` and `tools/` are not linted** — don't reformat them to satisfy a gate that never runs on them. `data_loader/dataloader.py` is excluded in `ruff.toml` via `extend-exclude` + `force-exclude` (see Known gaps); `data_loader/unzip_data.py` still is linted.
 
 `.github/workflows/quality.yml` runs the same `make quality` on Python 3.13, installing only `requirements/dev.txt`.
 
@@ -59,4 +59,5 @@ Match the existing house style — `utils/fancy_barplot.py` and `utils/triple_pl
 - **`requirements.txt` is empty**, so runtime deps are undeclared; `requirements/dev.txt` covers lint tooling only.
 - **`config.py` is stale for local use**: `DATADIR`/`CSV_DIR` point at `V:/projects/luna25/...` and `MODEL_RGB_I3D` at a `resources/` folder that doesn't exist, while the real data lives in `data/labels/` and `data/images/`. It also hardcodes an absolute `WORKDIR` and creates `results/` as an import side effect.
 - **`.gitignore` line 1 is `*.csv`**, so the LUNA25 labels CSV is deliberately untracked.
-- **`make quality` currently fails**, and not because of `utils/`: all 71 errors come from the vendored `data_loader/dataloader.py` (`E501` long lines, `N802`/`N803`/`N806` camelCase from the upstream baseline), plus 2 `E501` in `notebooks/initial_eda.ipynb`. Both are still untracked. Treat the dataloader's naming violations as vendor debt to fix when that module is rewritten, not as a lint task to clear en route to something else.
+- **`data_loader/dataloader.py` is excluded from ruff on purpose** (`extend-exclude` + `force-exclude` in `ruff.toml`). It is vendored near-verbatim from the upstream baseline and marked `PLACEHOLDER`; its 59 findings were upstream style, 33 of them camelCase naming (`N802`/`N803`/`N806`). Treat that as vendor debt to settle when the module is rewritten — don't "fix" it, and don't remove the exclusion to make a number look better. `force-exclude` is what makes the exclusion hold for editor integrations, which pass explicit file paths that a plain `extend-exclude` would not catch.
+- **`make quality` still fails**, now solely on `notebooks/image_caracteristics.ipynb`: 16 `E501` long lines in the mapping dictionaries and the `hub_pruebas_num_cat` calls (cells 39, 48, 52, 58). That is the project's own code, not vendored, so it is a real cleanup rather than something to exclude.
