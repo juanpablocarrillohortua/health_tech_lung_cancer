@@ -214,6 +214,11 @@ Gatsonis, C., Marcus, P. M., & Sicks, J. D. (2011). Reduced lung-cancer
 mortality with low-dose computed tomographic screening. *New England Journal
 of Medicine, 365*(5), 395–409. https://doi.org/10.1056/nejmoa1102873
 
+### Institutional guidelines
+
+Universidad Externado de Colombia. (2024). *Lineamientos para el uso de
+inteligencia artificial*.
+
 ### Tools and implementations
 
 Diagnostic Image Analysis Group, Radboud University Medical Center. (2025).
@@ -312,3 +317,48 @@ Ruff 0.16.5.
 ## Licence
 
 MIT — see [LICENSE](LICENSE).
+
+## Artificial Intelligence Use Statement
+
+In accordance with the *Lineamientos para el uso de Inteligencia Artificial* of
+the Universidad Externado de Colombia (2024), this section declares the use of
+generative artificial intelligence in the preparation of this work.
+
+This project was developed with the assistance of **Claude** (Anthropic), used
+as a support tool. The assistance covered the implementation of the analysis
+utilities in `utils/` and `domain_utils/`, the review of existing code, and the
+drafting of technical documentation, in each case from specifications and
+requirements defined by the author. The research question, the choice of the
+study to replicate, the analytical design, the methodological decisions, the
+interpretation of the results and the conclusions of the work are the author's
+own. The tool was directed at each step and its output was never incorporated
+without review: every result reported here was checked against the data, and
+several of the tool's proposals were corrected or rejected. The author retains
+intellectual command over the work and full responsibility for its sufficiency,
+accuracy and academic quality, as required by §§ 4.2 and 4.3 of the
+Lineamientos, which establish that issuing prompts alone constitutes neither
+responsible use nor a significant contribution.
+
+Specifically, and in line with the Lineamientos:
+
+- **Disclosure (§ 4.5.2).** The use of artificial intelligence is declared here
+  for the project as a whole, and no assisted content is attributed as the
+  author's own unaided work. This statement, rather than the commit history, is
+  the disclosure of record.
+- **Verification (§ 4.5.3).** All figures, statistics and technical claims were
+  verified against the source data and the cited documents. Responsibility for
+  any remaining error rests with the author, irrespective of its origin.
+- **Data protection (§ 4.5.5).** Only de-identified, publicly released research
+  data (LUNA25 and NLST) was used. No personal, clinical, confidential or
+  institutional data of members of the university community was submitted to
+  any artificial intelligence system.
+- **Citation of sources (§ 4.5.4).** All data sources, software and prior work
+  are cited in the [References](#references) section and in
+  [references.bib](references.bib).
+- **Authorship (§ 5).** Authorship is claimed on the basis of a significant
+  contribution to the conception, design and development of the work, and not
+  merely on having posed the problem to an automated system or supervised its
+  output.
+
+> Universidad Externado de Colombia. (2024). *Lineamientos para el uso de
+> inteligencia artificial*.
