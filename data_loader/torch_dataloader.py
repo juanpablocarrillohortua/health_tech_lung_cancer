@@ -11,51 +11,62 @@ Diferencias de diseño respecto al baseline
    `PatchExtractor`, que es un `nn.Module` y corre en el device que le pongas.
 
 2. REMUESTREO EN GPU. El baseline llama a `scipy.ndimage.affine_transform` por
-   muestra dentro del worker de CPU. Aquí la transformación afín se expresa como
-   un grid y se aplica con `F.grid_sample` sobre el batch completo. La matemática
-   es idéntica (verificada contra scipy hasta ~1e-11, ver `selftest_vs_scipy`).
+   muestra dentro del worker de CPU. Aquí la transformación afín se expresa
+   como un grid y se aplica con `F.grid_sample` sobre el batch completo.
+   La matemática es idéntica (verificada contra scipy hasta ~1e-11, ver
+   `selftest_vs_scipy`).
 
-3. DEVICE-AGNOSTIC. `get_device()` resuelve cuda/mps/cpu y `Luna25Batch.to(device)`
-   mueve el batch entero. Ningún `.cuda()` fijo en el código.
+3. DEVICE-AGNOSTIC. `get_device()` resuelve cuda/mps/cpu y
+    `Luna25Batch.to(device)` mueve el batch entero. Ningún `.cuda()`
+    fijo en el código.
 
 Convenios de coordenadas
 ------------------------
 Los ejes del volumen se manejan en orden de array numpy, es decir (0, 1, 2) =
-(D, H, W). `origin`, `spacing` y `transform` se pasan tal cual vienen del .npy de
-metadatos y se combinan con la MISMA fórmula del baseline:
+(D, H, W). `origin`, `spacing` y `transform` se pasan tal cual vienen del .npy
+de metadatos y se combinan con la MISMA fórmula del baseline:
 
     voxel = inv(transform) @ (world - origin) / spacing
     world = origin + transform @ (voxel * spacing)
 
-CoordX/Y/Z del CSV van en orden inverso al de los ejes del array, así que hay que
-LEERLAS INVERTIDAS: `coord_order="zyx"`, que es el valor por defecto. Verificado
-con `verify_coordinate_convention` sobre 300 anotaciones: con "zyx" el 100% de los
-centros cae dentro del bloque, a 1.0 vóxel de mediana del centro; con "xyz" solo
-el 11.3% cae dentro y la mediana se va a 278 vóxeles. Leerlas mal no da error:
-grid_sample muestrea fuera del volumen y padding_mode="border" devuelve un patch
-de bandas horizontales, con contraste nódulo-entorno de ~11 HU en vez de ~344.
-Si algún día cambia el empaquetado de los bloques, vuelve a correr
-`verify_coordinate_convention` antes de asumir nada.
+CoordX/Y/Z del CSV van en orden inverso al de los ejes del array, así que hay
+que LEERLAS INVERTIDAS: `coord_order="zyx"`, que es el valor por defecto.
+Verificado con `verify_coordinate_convention` sobre 300 anotaciones: con "zyx"
+el 100% de los centros cae dentro del bloque, a 1.0 vóxel de mediana del
+centro; con "xyz" solo el 11.3% cae dentro y la mediana se va a 278 vóxeles.
+Leerlas mal no da error: grid_sample muestrea fuera del volumen y
+padding_mode="border" devuelve un patch de bandas horizontales, con contraste
+nódulo-entorno de ~11 HU en vez de ~344. Si algún día cambia el empaquetado de
+los bloques, vuelve a correr `verify_coordinate_convention` antes de asumir
+nada.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Iterable, Sequence  # noqa: F401
 
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as F  # noqa: N812
 from torch.utils.data import DataLoader, Dataset
 
 __all__ = [
-    "get_device", "Luna25Batch", "Luna25BlockDataset", "collate_luna25",
-    "build_dataloader", "PatchExtractor", "clip_and_scale",
-    "world_to_voxel", "voxel_to_world", "random_rotation_matrices",
-    "random_sphere_offsets", "selftest_vs_scipy",
+    "get_device",
+    "Luna25Batch",
+    "Luna25BlockDataset",
+    "collate_luna25",
+    "build_dataloader",
+    "PatchExtractor",
+    "clip_and_scale",
+    "world_to_voxel",
+    "voxel_to_world",
+    "random_rotation_matrices",
+    "random_sphere_offsets",
+    "selftest_vs_scipy",
     "verify_coordinate_convention",
 ]
 
@@ -90,6 +101,7 @@ class Luna25Batch:
     center_vox  (B, 3)   esa misma coordenada en índices de vóxel del bloque
     label       (B,)     etiqueta de malignidad (-1 si no está en el CSV)
     """
+
     image: torch.Tensor | None
     origin: torch.Tensor
     spacing: torch.Tensor
@@ -105,14 +117,22 @@ class Luna25Batch:
         kw = {}
         for f in fields(self):
             v = getattr(self, f.name)
-            kw[f.name] = (v.to(device, non_blocking=non_blocking)
-                          if torch.is_tensor(v) else v)
+            kw[f.name] = (
+                v.to(device, non_blocking=non_blocking)
+                if torch.is_tensor(v)
+                else v
+            )
         return Luna25Batch(**kw)
 
     def pin_memory(self) -> "Luna25Batch":
-        kw = {f.name: (getattr(self, f.name).pin_memory()
-                       if torch.is_tensor(getattr(self, f.name))
-                       else getattr(self, f.name)) for f in fields(self)}
+        kw = {
+            f.name: (
+                getattr(self, f.name).pin_memory()
+                if torch.is_tensor(getattr(self, f.name))
+                else getattr(self, f.name)
+            )
+            for f in fields(self)
+        }
         return Luna25Batch(**kw)
 
     def __len__(self) -> int:
@@ -134,7 +154,7 @@ class Luna25BlockDataset(Dataset):
     coord_order : "zyx" (por defecto) invierte CoordX/Y/Z antes de aplicar la
         fórmula world->voxel, que es lo correcto para los bloques de LUNA25:
         origin/spacing/transform vienen en orden de array (z, y, x) y las
-        coordenadas del CSV en orden (x, y, z). "xyz" las usa tal cual y deja el
+        coordenadas del CSV en orden (x, y, z). "xyz" las usa tal cual y deja a
         88.7% de los centros fuera del bloque. Comprobable con
         `verify_coordinate_convention`.
     mmap : np.load con mmap_mode="r". Solo conviene si vas a leer un subconjunt
@@ -166,7 +186,9 @@ class Luna25BlockDataset(Dataset):
         self.metadata_dir = self.data_dir / metadata_subdir
         self.id_col = id_col
         self.label_col = label_col if (label_col in dataset.columns) else None
-        self.patient_col = patient_col if (patient_col in dataset.columns) else None
+        self.patient_col = (
+            patient_col if (patient_col in dataset.columns) else None
+        )
         self.coord_cols = list(coord_cols)
         if coord_order not in ("xyz", "zyx"):
             raise ValueError("coord_order debe ser 'xyz' o 'zyx'")
@@ -192,36 +214,54 @@ class Luna25BlockDataset(Dataset):
         row = self.dataset.iloc[idx]
         annotation_id = str(row[self.id_col])
 
-        meta = np.load(self.metadata_path(annotation_id), allow_pickle=True).item()
+        meta = np.load(
+            self.metadata_path(annotation_id), allow_pickle=True
+        ).item()
         origin = np.asarray(meta["origin"], dtype=np.float64).reshape(3)
         spacing = np.asarray(meta["spacing"], dtype=np.float64).reshape(3)
-        transform = np.asarray(meta["transform"], dtype=np.float64).reshape(3, 3)
+        transform = np.asarray(meta["transform"], dtype=np.float64).reshape(
+            3, 3
+        )
 
         image = None
         if self.load_image:
-            arr = np.load(self.image_path(annotation_id),
-                          mmap_mode="r" if self.mmap else None, allow_pickle=False)
-            if self.expected_shape is not None and tuple(arr.shape) != tuple(self.expected_shape):
-                msg = (f"{annotation_id}: shape {tuple(arr.shape)} != "
-                       f"{tuple(self.expected_shape)}")
+            arr = np.load(
+                self.image_path(annotation_id),
+                mmap_mode="r" if self.mmap else None,
+                allow_pickle=False,
+            )
+            if self.expected_shape is not None and tuple(arr.shape) != tuple(
+                self.expected_shape
+            ):
+                msg = (
+                    f"{annotation_id}: shape {tuple(arr.shape)} != "
+                    f"{tuple(self.expected_shape)}"
+                )
                 if self.strict_shape:
                     raise ValueError(msg)
             # copia explícita a contiguo: from_numpy sobre un memmap dejaría el
             # archivo mapeado dentro del tensor
-            image = torch.from_numpy(np.ascontiguousarray(arr, dtype=np.float32))
-            image = image.unsqueeze(0).to(self.dtype)          # (1, D, H, W)
+            image = torch.from_numpy(
+                np.ascontiguousarray(arr, dtype=np.float32)
+            )
+            image = image.unsqueeze(0).to(self.dtype)  # (1, D, H, W)
             shape = np.asarray(arr.shape, dtype=np.float64)
         else:
-            shape = (np.asarray(self.expected_shape, dtype=np.float64)
-                     if self.expected_shape is not None else np.full(3, np.nan))
+            shape = (
+                np.asarray(self.expected_shape, dtype=np.float64)
+                if self.expected_shape is not None
+                else np.full(3, np.nan)
+            )
 
         if self.has_coords:
-            coord = np.asarray([row[c] for c in self.coord_cols], dtype=np.float64)
+            coord = np.asarray(
+                [row[c] for c in self.coord_cols], dtype=np.float64
+            )
             world = coord[::-1].copy() if self.coord_order == "zyx" else coord
             center = world_to_voxel(world, origin, spacing, transform)
         else:
             world = np.full(3, np.nan)
-            center = (shape - 1) / 2.0        # el nódulo está centrado en el bloque
+            center = (shape - 1) / 2.0  # el nódulo está centrado en el bloque
 
         label = -1
         if self.label_col is not None and not pd.isna(row[self.label_col]):
@@ -233,24 +273,34 @@ class Luna25BlockDataset(Dataset):
             "spacing": torch.from_numpy(spacing).to(self.dtype),
             "transform": torch.from_numpy(transform).to(self.dtype),
             "coord_world": torch.from_numpy(world).to(self.dtype),
-            "center_vox": torch.from_numpy(np.ascontiguousarray(center)).to(self.dtype),
+            "center_vox": torch.from_numpy(np.ascontiguousarray(center)).to(
+                self.dtype
+            ),
             "label": torch.tensor(label, dtype=torch.long),
             "annotation_id": annotation_id,
-            "patient_id": (str(row[self.patient_col])
-                           if self.patient_col is not None else ""),
+            "patient_id": (
+                str(row[self.patient_col])
+                if self.patient_col is not None
+                else ""
+            ),
             "row_index": torch.tensor(idx, dtype=torch.long),
         }
 
     def __repr__(self) -> str:
-        return (f"{self.__class__.__name__}(n={len(self)}, dir='{self.data_dir}', "
-                f"load_image={self.load_image}, coord_order='{self.coord_order}')")
+        return (
+            f"{self.__class__.__name__}(n={len(self)}, dir='{self.data_dir}', "
+            f"load_image={self.load_image}, coord_order='{self.coord_order}')"
+        )
 
 
 def collate_luna25(samples: list[dict]) -> Luna25Batch:
-    stack = lambda k: torch.stack([s[k] for s in samples])
+    stack = lambda k: torch.stack([s[k] for s in samples])  # noqa: E731
     return Luna25Batch(
-        image=(torch.stack([s["image"] for s in samples])
-               if samples[0]["image"] is not None else None),
+        image=(
+            torch.stack([s["image"] for s in samples])
+            if samples[0]["image"] is not None
+            else None
+        ),
         origin=stack("origin"),
         spacing=stack("spacing"),
         transform=stack("transform"),
@@ -310,17 +360,22 @@ def world_to_voxel(world, origin, spacing, transform):
         v = torch.linalg.solve(transform, d).squeeze(-1)
         return v / spacing
     world = np.asarray(world, dtype=np.float64)
-    return np.linalg.solve(np.asarray(transform, dtype=np.float64),
-                           world - np.asarray(origin, dtype=np.float64)) / np.asarray(spacing)
+    return np.linalg.solve(
+        np.asarray(transform, dtype=np.float64),
+        world - np.asarray(origin, dtype=np.float64),
+    ) / np.asarray(spacing)
 
 
 def voxel_to_world(voxel, origin, spacing, transform):
     """world = origin + transform @ (voxel * spacing). numpy o torch."""
     if torch.is_tensor(voxel):
-        return origin + (transform @ (voxel * spacing).unsqueeze(-1)).squeeze(-1)
+        return origin + (transform @ (voxel * spacing).unsqueeze(-1)).squeeze(
+            -1
+        )
     voxel = np.asarray(voxel, dtype=np.float64)
-    return (np.asarray(origin, dtype=np.float64)
-            + np.asarray(transform, dtype=np.float64) @ (voxel * np.asarray(spacing)))
+    return np.asarray(origin, dtype=np.float64) + np.asarray(
+        transform, dtype=np.float64
+    ) @ (voxel * np.asarray(spacing))
 
 
 def sampling_matrix(spacing, transform, out_spacing, rotation=None):
@@ -334,17 +389,21 @@ def sampling_matrix(spacing, transform, out_spacing, rotation=None):
     W = transform if batched else transform.unsqueeze(0)
     B = s.shape[0]
     if rotation is None:
-        R = torch.eye(3, dtype=s.dtype, device=s.device).expand(B, 3, 3)
+        R = torch.eye(3, dtype=s.dtype, device=s.device).expand(B, 3, 3)  # noqa: N806
     else:
-        R = rotation if rotation.ndim == 3 else rotation.unsqueeze(0).expand(B, 3, 3)
+        R = (  # noqa: N806
+            rotation
+            if rotation.ndim == 3
+            else rotation.unsqueeze(0).expand(B, 3, 3)
+        )
 
     # inv(W).T  ->  usar solve por estabilidad
-    invW_T = torch.linalg.inv(W).transpose(-1, -2)
-    M = R @ invW_T
-    M = M / M.norm(dim=-1, keepdim=True)            # normalizar filas
-    out_vs = out_spacing.to(s.dtype).to(s.device).view(1, 1, 3)
-    M = (1.0 / s).unsqueeze(-1) * M.transpose(-1, -2) * out_vs
-    return M if batched else M.squeeze(0)
+    invW_T = torch.linalg.inv(W).transpose(-1, -2)  # noqa: N806
+    M = R @ invW_T  # noqa: N806
+    M = M / M.norm(dim=-1, keepdim=True)  # normalizar filas  # noqa: N806
+    out_vs = out_spacing.to(s.dtype).to(s.device).view(1, 1, 3)  # noqa: N806
+    M = (1.0 / s).unsqueeze(-1) * M.transpose(-1, -2) * out_vs  # noqa: N806
+    return M if batched else M.squeeze(0)  # noqa: N806
 
 
 # ===========================================================================
@@ -368,7 +427,7 @@ class PatchExtractor(nn.Module):
         size_mm: float = 50.0,
         mode: str = "3D",
         padding_mode: str = "zeros",
-        interpolation: str = "bilinear",   # trilineal para entrada 5D
+        interpolation: str = "bilinear",  # trilineal para entrada 5D
         repeat_channels_2d: int = 3,
     ) -> None:
         super().__init__()
@@ -384,59 +443,79 @@ class PatchExtractor(nn.Module):
         out_shape = (1, size_px, size_px) if mode == "2D" else (size_px,) * 3
         self.out_shape = out_shape
         vs = self.size_mm / self.size_px
-        self.register_buffer("out_spacing", torch.tensor([vs, vs, vs]), persistent=False)
+        self.register_buffer(
+            "out_spacing", torch.tensor([vs, vs, vs]), persistent=False
+        )
 
-        idx = torch.stack(torch.meshgrid(
-            *[torch.arange(n, dtype=torch.float32) for n in out_shape], indexing="ij"
-        ), dim=-1)
+        idx = torch.stack(
+            torch.meshgrid(
+                *[torch.arange(n, dtype=torch.float32) for n in out_shape],
+                indexing="ij",
+            ),
+            dim=-1,
+        )
         idx = idx - (torch.tensor(out_shape, dtype=torch.float32) - 1) / 2.0
-        self.register_buffer("base_idx", idx, persistent=False)   # (Do,Ho,Wo,3)
+        self.register_buffer("base_idx", idx, persistent=False)  # (Do,Ho,Wo,3)
 
     def forward(
         self,
-        image: torch.Tensor,          # (B, 1, D, H, W)
-        spacing: torch.Tensor,        # (B, 3)
-        transform: torch.Tensor,      # (B, 3, 3)
-        center_vox: torch.Tensor,     # (B, 3)
-        rotation: torch.Tensor | None = None,        # (B, 3, 3)
-        translation_vox: torch.Tensor | None = None, # (B, 3)
+        image: torch.Tensor,  # (B, 1, D, H, W)
+        spacing: torch.Tensor,  # (B, 3)
+        transform: torch.Tensor,  # (B, 3, 3)
+        center_vox: torch.Tensor,  # (B, 3)
+        rotation: torch.Tensor | None = None,  # (B, 3, 3)
+        translation_vox: torch.Tensor | None = None,  # (B, 3)
     ) -> torch.Tensor:
         if image.ndim != 5:
-            raise ValueError(f"se esperaba (B,1,D,H,W), llegó {tuple(image.shape)}")
-        B = image.shape[0]
+            raise ValueError(
+                f"se esperaba (B,1,D,H,W), llegó {tuple(image.shape)}"
+            )
+        B = image.shape[0]  # noqa: N806
         dt = image.dtype
 
-        M = sampling_matrix(spacing.to(dt), transform.to(dt),
-                            self.out_spacing, rotation.to(dt) if rotation is not None else None)
+        M = sampling_matrix(  # noqa: N806
+            spacing.to(dt),
+            transform.to(dt),
+            self.out_spacing,
+            rotation.to(dt) if rotation is not None else None,
+        )
 
         center = center_vox.to(dt)
         if translation_vox is not None:
             center = center + translation_vox.to(dt)
 
         offs = torch.einsum("bij,dhwj->bdhwi", M, self.base_idx.to(dt))
-        in_vox = center.view(B, 1, 1, 1, 3) + offs                  # orden (z,y,x)
+        in_vox = center.view(B, 1, 1, 1, 3) + offs  # orden (z,y,x)
 
         size = torch.tensor(image.shape[-3:], dtype=dt, device=image.device)
         grid = 2.0 * in_vox / (size - 1) - 1.0
-        grid = grid.flip(-1)                     # grid_sample espera (x, y, z)
+        grid = grid.flip(-1)  # grid_sample espera (x, y, z)
 
-        patch = F.grid_sample(image, grid, mode=self.interpolation,
-                              padding_mode=self.padding_mode, align_corners=True)
+        patch = F.grid_sample(
+            image,
+            grid,
+            mode=self.interpolation,
+            padding_mode=self.padding_mode,
+            align_corners=True,
+        )
 
         if self.mode == "2D":
-            patch = patch[:, :, 0]                                   # (B,1,H,W)
+            patch = patch[:, :, 0]  # (B,1,H,W)
             if self.repeat_channels_2d > 1:
                 patch = patch.repeat(1, self.repeat_channels_2d, 1, 1)
         return patch
 
     def extra_repr(self) -> str:
-        return (f"size_px={self.size_px}, size_mm={self.size_mm}, mode={self.mode}, "
-                f"out_spacing={self.size_mm/self.size_px:.4f}mm, "
-                f"padding_mode={self.padding_mode}")
+        return (
+            f"size_px={self.size_px}, size_mm={self.size_mm}, mode={self.mode}, "  # noqa: E501
+            f"out_spacing={self.size_mm / self.size_px:.4f}mm, "
+            f"padding_mode={self.padding_mode}"
+        )
 
 
-def clip_and_scale(x: torch.Tensor, min_hu: float = -1000.0,
-                   max_hu: float = 400.0) -> torch.Tensor:
+def clip_and_scale(
+    x: torch.Tensor, min_hu: float = -1000.0, max_hu: float = 400.0
+) -> torch.Tensor:
     """
     Ventana pulmonar del baseline, a [0, 1]. Es una decisión de análisis,
     por eso está fuera del Dataset.
@@ -450,48 +529,74 @@ def clip_and_scale(x: torch.Tensor, min_hu: float = -1000.0,
 # ===========================================================================
 # Aumento (opcional, se aplica en la etapa de extracción, no en el loader)
 # ===========================================================================
-def random_rotation_matrices(n: int, degrees=((-20, 20), (-20, 20), (-20, 20)),
-                             device=None, dtype=torch.float32,
-                             generator=None) -> torch.Tensor:
+def random_rotation_matrices(
+    n: int,
+    degrees=((-20, 20), (-20, 20), (-20, 20)),
+    device=None,
+    dtype=torch.float32,
+    generator=None,
+) -> torch.Tensor:
     """Rotaciones aleatorias Rx@Ry@Rz. `degrees` en orden (z, y, x) como el
     baseline: ((zmin,zmax),(ymin,ymax),(xmin,xmax))."""
     (zmin, zmax), (ymin, ymax), (xmin, xmax) = degrees
+
     def ang(lo, hi):
         u = torch.rand(n, device=device, dtype=dtype, generator=generator)
         return (u * (hi - lo) + lo) * torch.pi / 180.0
+
     ax, ay, az = ang(xmin, xmax), ang(ymin, ymax), ang(zmin, zmax)
-    o, i = torch.zeros(n, device=device, dtype=dtype), torch.ones(n, device=device, dtype=dtype)
+    o, i = (
+        torch.zeros(n, device=device, dtype=dtype),
+        torch.ones(n, device=device, dtype=dtype),
+    )
+
     def mat(rows):
         return torch.stack([torch.stack(r, -1) for r in rows], -2)
-    Rx = mat([(i, o, o), (o, ax.cos(), -ax.sin()), (o, ax.sin(), ax.cos())])
-    Ry = mat([(ay.cos(), o, ay.sin()), (o, i, o), (-ay.sin(), o, ay.cos())])
-    Rz = mat([(az.cos(), -az.sin(), o), (az.sin(), az.cos(), o), (o, o, i)])
+
+    Rx = mat([(i, o, o), (o, ax.cos(), -ax.sin()), (o, ax.sin(), ax.cos())])  # noqa: N806
+    Ry = mat([(ay.cos(), o, ay.sin()), (o, i, o), (-ay.sin(), o, ay.cos())])  # noqa: N806
+    Rz = mat([(az.cos(), -az.sin(), o), (az.sin(), az.cos(), o), (o, o, i)])  # noqa: N806
     return Rx @ Ry @ Rz
 
 
-def random_sphere_offsets(spacing: torch.Tensor, radius_mm: float = 2.5,
-                          generator=None) -> torch.Tensor:
+def random_sphere_offsets(
+    spacing: torch.Tensor, radius_mm: float = 2.5, generator=None
+) -> torch.Tensor:
     """Desplazamientos aleatorios dentro de una esfera de `radius_mm`,
     devueltos en vóxeles. Réplica del aumento de traslación del baseline."""
     n = spacing.shape[0]
-    v = torch.randn(n, 3, device=spacing.device, dtype=spacing.dtype, generator=generator)
+    v = torch.randn(
+        n, 3, device=spacing.device, dtype=spacing.dtype, generator=generator
+    )
     v = v / v.norm(dim=-1, keepdim=True).clamp_min(1e-12)
-    r = torch.rand(n, 1, device=spacing.device, dtype=spacing.dtype,
-                   generator=generator) * radius_mm
+    r = (
+        torch.rand(
+            n,
+            1,
+            device=spacing.device,
+            dtype=spacing.dtype,
+            generator=generator,
+        )
+        * radius_mm
+    )
     return v * r / spacing
 
 
 # ===========================================================================
 # Verificación de la convención de coordenadas
 # ===========================================================================
-def verify_coordinate_convention(data_dir, dataset, n: int = 300,
-                                 expected_shape=(64, 128, 128),
-                                 verbose: bool = True) -> dict:
+def verify_coordinate_convention(
+    data_dir,
+    dataset,
+    n: int = 300,
+    expected_shape=(64, 128, 128),
+    verbose: bool = True,
+) -> dict:
     """¿CoordX/Y/Z hay que leerlas tal cual ("xyz") o invertidas ("zyx")?
 
     Los bloques vienen recortados alrededor del nódulo, así que la convención
-    correcta es la que deja el centro anotado en el centro del bloque. Se prueban
-    las dos y se comparan contra `(shape - 1) / 2`.
+    correcta es la que deja el centro anotado en el centro del bloque.
+    Se prueban las dos y se comparan contra `(shape - 1) / 2`.
 
     Solo lee los .npy de metadatos, no las imágenes, así que recorrer unos
     cientos de anotaciones tarda segundos.
@@ -510,19 +615,27 @@ def verify_coordinate_convention(data_dir, dataset, n: int = 300,
     for order in ("xyz", "zyx"):
         vox = []
         for _, row in df.iterrows():
-            m = np.load(meta_dir / f"{row['AnnotationID']}.npy",
-                        allow_pickle=True).item()
-            coord = np.asarray([row["CoordX"], row["CoordY"], row["CoordZ"]],
-                               dtype=np.float64)
+            m = np.load(
+                meta_dir / f"{row['AnnotationID']}.npy", allow_pickle=True
+            ).item()
+            coord = np.asarray(
+                [row["CoordX"], row["CoordY"], row["CoordZ"]], dtype=np.float64
+            )
             world = coord[::-1] if order == "zyx" else coord
-            vox.append(world_to_voxel(world, np.asarray(m["origin"]).reshape(3),
-                                      np.asarray(m["spacing"]).reshape(3),
-                                      np.asarray(m["transform"]).reshape(3, 3)))
+            vox.append(
+                world_to_voxel(
+                    world,
+                    np.asarray(m["origin"]).reshape(3),
+                    np.asarray(m["spacing"]).reshape(3),
+                    np.asarray(m["transform"]).reshape(3, 3),
+                )
+            )
         v = np.asarray(vox)
         out[order] = {
             "inside_frac": float(((v >= 0) & (v < shape)).all(1).mean()),
             "median_dist_vox": float(
-                np.median(np.linalg.norm(v - center, axis=1))),
+                np.median(np.linalg.norm(v - center, axis=1))
+            ),
             "mean_center": v.mean(0),
         }
 
@@ -531,9 +644,11 @@ def verify_coordinate_convention(data_dir, dataset, n: int = 300,
         print(f"centro esperado del bloque: {center}")
         for order in ("xyz", "zyx"):
             r = out[order]
-            print(f"  coord_order={order!r}: dentro={r['inside_frac']:.1%}  "
-                  f"dist. mediana={r['median_dist_vox']:.1f} vox  "
-                  f"centro medio={np.round(r['mean_center'], 1)}")
+            print(
+                f"  coord_order={order!r}: dentro={r['inside_frac']:.1%}  "
+                f"dist. mediana={r['median_dist_vox']:.1f} vox  "
+                f"centro medio={np.round(r['mean_center'], 1)}"
+            )
         print(f"-> usa coord_order={out['best']!r}")
     return out
 
@@ -562,26 +677,39 @@ def selftest_vs_scipy(tol: float = 1e-3, verbose: bool = True) -> bool:
     dev = get_device()
     ex = PatchExtractor(size_px=64, size_mm=50.0, mode="3D").to(dev)
     ok = True
-    for spacing, W in cases:
+    for spacing, W in cases:  # noqa: N806
         center = np.array(vol.shape) // 2
         ref = extract_patch(
-            CTData=vol, coord=tuple(center), srcVoxelOrigin=np.zeros(3),
-            srcWorldMatrix=W, srcVoxelSpacing=spacing,
+            CTData=vol,
+            coord=tuple(center),
+            srcVoxelOrigin=np.zeros(3),
+            srcWorldMatrix=W,
+            srcVoxelSpacing=spacing,
             output_shape=(64, 64, 64),
-            voxel_spacing=(50.0 / 64,) * 3, rotations=None, translations=None,
-            coord_space_world=False, mode="3D")[0]
+            voxel_spacing=(50.0 / 64,) * 3,
+            rotations=None,
+            translations=None,
+            coord_space_world=False,
+            mode="3D",
+        )[0]
 
-        got = ex(
-            torch.from_numpy(vol)[None, None].to(dev),
-            torch.tensor(spacing, dtype=torch.float32)[None].to(dev),
-            torch.tensor(W, dtype=torch.float32)[None].to(dev),
-            torch.tensor(center, dtype=torch.float32)[None].to(dev),
-        )[0, 0].cpu().numpy()
+        got = (
+            ex(
+                torch.from_numpy(vol)[None, None].to(dev),
+                torch.tensor(spacing, dtype=torch.float32)[None].to(dev),
+                torch.tensor(W, dtype=torch.float32)[None].to(dev),
+                torch.tensor(center, dtype=torch.float32)[None].to(dev),
+            )[0, 0]
+            .cpu()
+            .numpy()
+        )
 
         d = np.abs(ref - got).max()
         ok &= d < tol
         if verbose:
-            print(f"spacing={spacing} det(W)={np.linalg.det(W):+.0f}  max|dif|={d:.2e}")
+            print(
+                f"spacing={spacing} det(W)={np.linalg.det(W):+.0f}  max|dif|={d:.2e}"  # noqa: E501
+            )
     if verbose:
         print("OK" if ok else "FALLO")
     return ok
