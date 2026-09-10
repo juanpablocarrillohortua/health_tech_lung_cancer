@@ -36,6 +36,7 @@ test_features_against_target(df, ["Age_at_StudyDate", "race"], "label")
 | [`triple_plot`](triple_plot.py) | Is this variable normal? | `normality_report` | `dict` |
 | [`corr_vector`](corr_vector.py) | Pearson correlation of everything against one target | `plot_target_correlation` | `(fig, ax)` |
 | [`mutual_inf_plot`](mutual_inf_plot.py) | Feature relevance = correlation + mutual information | `analizar_relevancia_caracteristicas` (+4) | `DataFrame` |
+| [`vif_resume`](vif_resume.py) | Which predictors are redundant with each other? | `vif_table` | `DataFrame` |
 | [`fast_OLS`](fast_OLS.py) | Full diagnostics of a fitted OLS model | class `DiagnosticoOLS` | varies |
 
 > **Two modules do not import today.** `fast_OLS` needs `plotly` and
@@ -318,6 +319,51 @@ MinMax-normalised to 0-1. Built for a **binary target**.
 Note `target` defaults to `"is_popular"` in every function — a leftover from
 another project, so pass it explicitly.
 
+## `vif_resume`
+
+Variance inflation factor: how much each predictor is explained by the
+others. `VIF ≈ 1` is independent, `5–10` is worth noting, `> 10` is the usual
+cut-off for dropping a variable. The target is **excluded** — VIF describes
+the predictors' relationship to each other, not to what you are predicting.
+
+### `vif_table(df, target_variable, ...)`
+
+| Parameter | Default | Meaning |
+| --- | --- | --- |
+| `df` | — | DataFrame |
+| `target_variable` | — | excluded from the computation; must exist |
+| `feature_variables` | `None` | predictors to use; `None` takes every numeric column but the target. Non-numeric columns are always dropped |
+| `cache_path` | `None` | pickle to save and reuse the result; `None` disables caching |
+| `refresh` | `False` | recompute and overwrite the cache |
+| `verbose` | `True` | print the dropped-column and conditioning warnings |
+
+Returns a `DataFrame` sorted by `VIF` descending:
+
+| Column | Meaning |
+| --- | --- |
+| `Variable` | column name |
+| `VIF` | inflation factor, `NaN` if the column was dropped |
+| `alto` | `True` when `VIF > 10` |
+| `descartada` | why it was dropped, or `None` |
+
+**Caching keys on the inputs, not the output** — you cannot know whether the
+result changed without computing it, which is what the cache exists to avoid.
+The pickle stores the table beside a SHA-256 of the column names, the target
+name and the values. On the next call the fingerprint is recomputed and the
+saved table is returned only if it matches. An unreadable or stale-format
+pickle counts as a miss, not an error. Hashing costs milliseconds against
+roughly a second for the computation.
+
+**Two guards against meaningless output.** Zero-variance columns are dropped
+first (their VIF is undefined) and reported in `descartada`. Then the design
+matrix — predictors *plus the constant*, which is what the VIF actually uses —
+is checked for rank deficiency; failing that, the condition index of the
+standardized predictors is checked against 30. Either way you get a warning
+naming the suspects, and the table still comes back: deciding what to drop is
+the analyst's call. Without these, an exact dependency such as "these
+fractions sum to 1" silently produces VIFs around 10¹⁴, which are numerical
+noise rather than a measurement.
+
 ## `fast_OLS`
 
 > Needs `plotly`, **not installed** — this module cannot be imported today.
@@ -383,4 +429,4 @@ Installed: `pandas`, `numpy`, `scipy`, `matplotlib`, `seaborn`, `statsmodels`,
 python -m pip install plotly scikit-learn
 ```
 
-The other nine modules import cleanly with what is already in `.venv`.
+The other ten modules import cleanly with what is already in `.venv`.
