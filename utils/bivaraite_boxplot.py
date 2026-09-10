@@ -1,5 +1,25 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
+from pandas.api.types import is_numeric_dtype
+
+
+def _outliers_only(df, num_col, cat_col):
+    """Filas atípicas de cada categoría, según la regla de 1.5 * IQR."""
+    datos = df[[num_col, cat_col]]
+    if datos[num_col].dtype == bool:
+        # quantile interpola haciendo b - a, que numpy no define para
+        # booleanos: castear evita un TypeError críptico.
+        datos = datos.assign(**{num_col: datos[num_col].astype("float64")})
+
+    def _flag(group):
+        q1, q3 = group[num_col].quantile([0.25, 0.75])
+        iqr = q3 - q1
+        lower, upper = q1 - 1.5 * iqr, q3 + 1.5 * iqr
+        return group[(group[num_col] < lower) | (group[num_col] > upper)]
+
+    return datos.groupby(cat_col, group_keys=False)[[num_col, cat_col]].apply(
+        _flag
+    )
 
 
 def plot_segmented_boxplot(
@@ -31,11 +51,17 @@ def plot_segmented_boxplot(
     orient : str, opcional
         Orientación del gráfico: 'v' (vertical) o 'h' (horizontal).
     show_points : bool, opcional
-        Si es True, superpone los puntos individuales de los datos con
-        transparencia.
+        Si es True, superpone únicamente los puntos atípicos (outliers)
+        con transparencia.
     title : str, opcional
         Título personalizado para el gráfico.
     """
+    # 0. Validar antes de crear la figura, para no dejarla huérfana si falla
+    if not is_numeric_dtype(df[num_col]):
+        raise ValueError(
+            f"num_col='{num_col}' debe ser numérica; llegó {df[num_col].dtype}"
+        )
+
     # 1. Aplicar tema minimalista base
     sns.set_theme(style="white", font="sans-serif")
 
@@ -64,7 +90,7 @@ def plot_segmented_boxplot(
     # 4. Capa opcional de puntos (Strip Plot) para visualizar distribución real
     if show_points:
         sns.stripplot(
-            data=df,
+            data=_outliers_only(df, num_col, cat_col),
             x=x_var,
             y=y_var,
             color="#1e293b",
